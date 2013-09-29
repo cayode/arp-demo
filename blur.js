@@ -1,13 +1,70 @@
-var http = require('http'),
+var net = require('net'),
     _ = require('underscore')._;
 
-http.createServer(function(req, res){
-    console.log(req.method + ' http://' + req.host + req.url + '\n');
-    console.log(JSON.stringify(req.headers) + '\n');
-    __dump(req, {depth: 4});
-    res.end('Hello world\n');
-}).listen(80);
+var server = net.createServer();
 
+server.on('connection', function(c){
+    var client = {
+        addr: c.remoteAddress,
+        conn: undefined,
+        buffered: ''
+    };
+    var target = undefined; // In this case c.localAddress is set to OUR address,
+                            // not the intercepted address that came in over the wire.
+                            // Better hope they set a Host header!
+    var host_header = /Host:\s*(.*)/i;
+
+    console.log(client.addr + ' connected');
+
+    c.on('data', function(chunk){
+        if (!target){
+            // still looking for a Host header
+            var a = chunk.toString().match(host_header);
+            if (a){
+                target = a[1];
+                console.log('Proxying ' + client.addr + ' for ' + target);
+                client.conn = net.connect({host: target, port: 80});
+                client.conn.on('connect', function(){
+                    if (client.buffered.length){
+                        client.conn.write(client.buffered);
+                        client.buffered = '';
+                    }
+                });
+                client.conn.on('data', function(resp_data){
+                    c.write(resp_data);
+                });
+                client.conn.on('error', function(e){
+                    console.log(client.addr + '> Error: ' + JSON.stringify(e));
+                    c.end();
+                });
+                client.conn.on('end', function(){
+                    c.end();
+                });
+            }
+        }
+        console.log(client.addr + '> ' + chunk);
+        if (client.conn){
+            client.conn.write(chunk);
+        }else{
+            client.buffered += chunk;
+        }
+    });
+    c.on('end', function(){
+        console.log(client.addr + ' disconnected\n');
+    });
+
+});
+
+server.on('error', function(e){
+    __dump(e, {name: 'Error', depth: 5});
+});
+
+server.listen(80, function(){
+    console.log('blur.js listening on port 80');
+});
+
+
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 var __dump_indent = 0;
 var __dump_accum = '';
