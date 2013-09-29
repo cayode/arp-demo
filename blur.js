@@ -3,27 +3,42 @@ var net = require('net'),
 
 var server = net.createServer();
 
+var n = 0;
+
 server.on('connection', function(c){
     var client = {
-        addr: c.remoteAddress,
+        addr: c.remoteAddress + '|' + (++n),
         conn: undefined,
         buffered: ''
     };
-    var target = undefined; // In this case c.localAddress is set to OUR address,
-                            // not the intercepted address that came in over the wire.
-                            // Better hope they set a Host header!
-    var host_header = /Host:\s*(.*)/i;
+    var url = undefined;
+    var method = undefined;
+    var dest_host = undefined; // In this case c.localAddress is set to OUR address,
+                               // not the intercepted address that came in over the wire.
+                               // Better hope they set a Host header!
 
     console.log(client.addr + ' connected');
 
+
     c.on('data', function(chunk){
-        if (!target){
+        var clean_data = chunk.toString('utf-8');
+        //clean_data = clean_data.replace(/accept-encoding.*/i, 'Accept-encoding:');
+        var a = clean_data.match(/(GET|PUT|DELETE|POST|HEAD)\s+(.*)\s+HTTP/);
+        if (a){
+            method = a[1];
+            url = a[2];
+            console.log(client.addr + '> ' + method + ' ' + url);
+            if (dest_host){
+                console.log('Continuing proxy transaction for ' + client.addr + '->' + dest_host);
+            }
+        }
+        if (!dest_host){
             // still looking for a Host header
-            var a = chunk.toString().match(host_header);
+            a = clean_data.match(/Host:\s*(.*)/i);
             if (a){
-                target = a[1];
-                console.log('Proxying ' + client.addr + ' for ' + target);
-                client.conn = net.connect({host: target, port: 80});
+                dest_host = a[1];
+                console.log('Proxying ' + client.addr + ' for ' + dest_host);
+                client.conn = net.connect({host: dest_host, port: 80});
                 client.conn.on('connect', function(){
                     if (client.buffered.length){
                         client.conn.write(client.buffered);
@@ -34,7 +49,7 @@ server.on('connection', function(c){
                     c.write(resp_data);
                 });
                 client.conn.on('error', function(e){
-                    console.log(client.addr + '> Error: ' + JSON.stringify(e));
+                    console.log(client.addr + '> Error (server): ' + JSON.stringify(e));
                     c.end();
                 });
                 client.conn.on('end', function(){
@@ -42,12 +57,15 @@ server.on('connection', function(c){
                 });
             }
         }
-        console.log(client.addr + '> ' + chunk);
+        //console.log(client.addr + '> ' + clean_data);
         if (client.conn){
-            client.conn.write(chunk);
+            client.conn.write(clean_data);
         }else{
-            client.buffered += chunk;
+            client.buffered += clean_data;
         }
+    });
+    c.on('error', function(e){
+        console.log(client.addr + '> Error (client): ' + JSON.stringify(e));
     });
     c.on('end', function(){
         console.log(client.addr + ' disconnected\n');
