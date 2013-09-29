@@ -5,6 +5,7 @@ http.createServer(function(req, res){
     console.log(req.method + ' http://' + req.host + req.url + '\n');
     console.log(JSON.stringify(req.headers) + '\n');
     __dump(req, {depth: 4});
+    res.end('Hello world\n');
 }).listen(80);
 
 
