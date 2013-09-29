@@ -16,6 +16,7 @@ function converter(req, res){
         res.end();
         return;
     }
+    console.log('converting ' + img);
     var curl = spawn(
         'curl',
         ['-s', img, '-o', '-'],
