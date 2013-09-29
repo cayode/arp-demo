@@ -3,7 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "request": "*",
-    "underscore": "*"
+    "express": "3.4.0"
   }
 }

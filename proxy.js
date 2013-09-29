@@ -1,5 +1,4 @@
-var net = require('net'),
-    _   = require('underscore')._;
+var net = require('net');
 
 var server = net.createServer();
 
