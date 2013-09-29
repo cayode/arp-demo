@@ -30,18 +30,6 @@ server.on('connection', function(c){
             is_img = url.match(/\.(jpg|png|gif)/i) !== null;
             dest_host = undefined;
             console.log(client.addr + '> ' + method + ' ' + url);
-            if (dest_host){
-                console.log(client.addr + '> continuing proxy transaction for ' + dest_host);
-                if (is_img){
-                    console.log(client.addr + '> forwarding image to blur.js');
-                    client.conn.write(
-                        'GET ' + '/?img=' + dest_host + url + ' HTTP/1.1\r\n' +
-                        'User-Agent: node/0.10.19\r\n' +
-                        'Accept: */*\r\n' +
-                        '\r\n'
-                    );
-                }
-            }
         }
         if (!dest_host){
             // still looking for a Host header
